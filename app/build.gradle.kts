@@ -74,6 +74,5 @@ dependencies {
     implementation(libs.logging.interceptor)
     implementation(libs.glide)
     implementation(libs.compose)
-
-
+    implementation(libs.landscapist.glide)
 }

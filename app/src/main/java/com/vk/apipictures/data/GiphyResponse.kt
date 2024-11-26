@@ -4,24 +4,24 @@ import com.google.gson.annotations.SerializedName
 
 data class GiphyResponse(
     @SerializedName("data")
-    val data: List<Response>
+    val data: List<GIFObject>
 )
 
-data class Response(
+data class GIFObject(
     @SerializedName("id")
     val id: String,
     @SerializedName("title")
     val title: String,
     @SerializedName("images")
-    val images: Image
+    val images: ImagesObject
 )
 
-data class Image(
+data class ImagesObject(
     @SerializedName("original")
-    val original: GIF
+    val original: Original
 )
 
-data class GIF(
+data class Original(
     @SerializedName("height")
     val height: String,
     @SerializedName("width")
