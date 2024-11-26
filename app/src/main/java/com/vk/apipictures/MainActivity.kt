@@ -1,20 +1,21 @@
 package com.vk.apipictures
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -24,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,25 +54,30 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GiphyAPI() {
     val list = remember { mutableStateListOf<String>() }
+    val titles = remember { mutableStateListOf<String>() }
+    val heights = remember { mutableStateListOf<Int>() }
+    var offset by remember { mutableIntStateOf(0) }
+
     var isError by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf("") }
 
-    LaunchedEffect(isError) {
-        if (list.isEmpty()) {
-            try {
-                val response = RetrofitInstance.api.getGIF(API_KEY, 10, 0)
-                for (item in response.data) {
-                    list.add(item.images.original.url)
-                }
-            } catch (e: Exception) {
-                errorMessage = "${e.message}"
-                isError = true
-            } finally {
-                isLoading = false
+    LaunchedEffect(isError, offset) {
+        try {
+            val response = RetrofitInstance.api.getGIF(API_KEY, 10, offset)
+            for (item in response.data) {
+                list.add(item.images.original.url)
+                titles.add(item.title)
+                heights.add(item.images.original.height.toInt())
             }
+        } catch (e: Exception) {
+            errorMessage = "${e.message}"
+            isError = true
+        } finally {
+            isLoading = false
         }
     }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -76,8 +85,7 @@ fun GiphyAPI() {
     ) {
         if (isLoading) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
@@ -85,8 +93,7 @@ fun GiphyAPI() {
         }
         if (isError) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -97,34 +104,36 @@ fun GiphyAPI() {
                     color = Color.Red,
                 )
                 Button(
-                    onClick = {
-                        isError = false
-                    }
+                    onClick = { isError = false }
                 ) { Text(text = "Try Again") }
             }
         } else {
-            LazyVerticalStaggeredGrid(list)
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(2),
+                verticalItemSpacing = 4.dp,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                content = {
+                    items(list.size) { position ->
+                        GlideListBlock(list[position], titles, position, heights[position])
+                    }
+                    item {
+                        Button(
+                            onClick = { offset += 11 },
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            Text(text = "Load more")
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
 
 @Composable
-fun LazyVerticalStaggeredGrid(list: MutableList<String>) {
-    LazyVerticalStaggeredGrid(
-        columns = StaggeredGridCells.Fixed(2),
-        verticalItemSpacing = 4.dp,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        content = {
-            items(list) { url ->
-                GlideListBlock(url)
-            }
-        },
-        modifier = Modifier.fillMaxSize()
-    )
-}
-
-@Composable
-fun GlideListBlock(url: String) {
+fun GlideListBlock(url: String, titles: MutableList<String>, position: Int, height: Int) {
+    val context = LocalContext.current
     Surface(
         shape = MaterialTheme.shapes.medium,
         shadowElevation = 1.dp,
@@ -136,13 +145,24 @@ fun GlideListBlock(url: String) {
                 MaterialTheme.colorScheme.primary,
                 RoundedCornerShape(12.dp)
             )
+            .clickable(
+                onClick = {
+                    Toast
+                        .makeText(
+                            context,
+                            titles[position],
+                            Toast.LENGTH_SHORT
+                        )
+                        .show()
+                }
+            )
     )
     {
         GlideImage(
             imageModel = { url },
             modifier = Modifier
-                .fillMaxSize()
-                .fillMaxHeight(),
+                .fillMaxWidth()
+                .height(with(LocalDensity.current) { height.toDp() }),
             loading = {
                 Box(
                     modifier = Modifier
@@ -154,9 +174,8 @@ fun GlideListBlock(url: String) {
                 }
             },
             failure = {
-                val rememberedUrl = remember { mutableStateOf(url) }
                 Button(
-                    onClick = { rememberedUrl.value = url },
+                    onClick = { /* I don't know what to do here */ },
                     modifier = Modifier
                         .height(200.dp)
                         .fillMaxSize(),
